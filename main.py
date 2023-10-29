@@ -1,17 +1,31 @@
 import cv2
 import time
 import numpy as np
+from tabulate import tabulate
+import matplotlib.pyplot as plt
+
+
 thres = 0.5 # Threshold to detect object
 nms_threshold = 0.1  # Non-maximum Suppression
 
-cap = cv2.VideoCapture("C:/Users/Dell/Desktop/Minor/video2.mp4")
+video_path = "C:/Users/Dell/Desktop/Minor/video5.mp4"
+
+cap = cv2.VideoCapture(video_path)
 cap.set(3,1280)
 cap.set(4,720)
 cap.set(10,70)
 
+
 if not cap.isOpened():
     print("Error: Could not open the video file.")
     exit()
+
+
+fps = cap.get(cv2.CAP_PROP_FPS)
+total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+# Calculate the duration of the video in seconds
+duration = total_frames / fps
 
 classNames= []
 classFile = 'coco.names'
@@ -27,72 +41,86 @@ net.setInputScale(1.0/ 127.5)
 net.setInputMean((127.5, 127.5, 127.5))
 net.setInputSwapRB(True)
 
-duration = 10
+
 
 t_end = time.time() + duration
-person_time = []
-bottle_time = []
+
 init_time = time.time() 
 
-ct_person_maxi =  -1
-person_ct = []
+
+computers = []
+keyboards = []
+mouses = []
 
 c=0
 curtime=time.time()
 while time.time() < t_end:
+    
+    success,img = cap.read()
+    classIds, confs, bbox = net.detect(img,confThreshold=thres)
+    # print(classIds)
+
+    bbox = list(bbox)
+    confs = list(np.array(confs).reshape(1,-1)[0])
+    confs = list(map(float,confs))
+    #print(type(confs[0]))
+    #print(confs)
+
+    indices = cv2.dnn.NMSBoxes(bbox,confs,thres,nms_threshold)
+    # indices = list(indices)
+    # print(indices)
+
 
     if(int(curtime+1)==int(time.time())):
+        
         curtime = time.time()
 
-
-        success,img = cap.read()
-        classIds, confs, bbox = net.detect(img,confThreshold=thres)
-        # print(classIds)
-        bbox = list(bbox)
-        confs = list(np.array(confs).reshape(1,-1)[0])
-        confs = list(map(float,confs))
-        #print(type(confs[0]))
-        #print(confs)
+        count_computer = 0
+        count_keyboard = 0
+        count_mouse = 0
         
-        set_id = 0 
-        ct = 0 
-        for i in classIds :
-            if i == 73 or i==72:
-                set_id = 1 
-                ct+=1
-    
-        person_ct.append(ct)
-        ct_person_maxi = max(ct_person_maxi,ct) 
-        
-        if(set_id == 1) :
-        # print("Person Detected")
-            curr = time.time()
-            person_time.append(int(curr-init_time)) 
-        # print(curr)
-    
-    # set_id2= 0 
-    # for i in classIds :                
-    #     if i ==  44:
-    #         set_id2 = 1 
-    #         break
-        
-    # if(set_id2 == 1) :
-    #     # print("Bottle Detected")
-    #     curr = time.time()
-    #     bottle_time.append(int(curr-init_time)) 
-    #     # print(curr)
-        
-        indices = cv2.dnn.NMSBoxes(bbox,confs,thres,nms_threshold)
-        # indices = list(indices)
-        # print(indices[1])
-
         for i in indices:
+            # print(classIds[i])
+            if classIds[i] in [72, 73]:
+                count_computer += 1
+            if classIds[i] == 76:
+                count_keyboard += 1
+            if classIds[i] == 74:
+                count_mouse += 1
+
+        print("---------------------------------------")
+        print(f"No of Computers : {count_computer}")
+        print(f"No of keyboard : {count_keyboard}")
+        print(f"No of Mouse : {count_mouse}")
+        print("---------------------------------------")
+        print()
+
+        if count_computer == 0:
+            print("---------------------------------------")
+            print("WARNING !!! NO COMPUTER DETECTED !!!")
+            print("---------------------------------------")
+
+        if count_keyboard == 0:
+            print("---------------------------------------")
+            print("WARNING !!! NO KEYBOARD DETECTED !!!")
+            print("---------------------------------------")
+
+        if count_mouse == 0:
+            print("---------------------------------------")
+            print("WARNING !!! NO MOUSE DETECTED !!!")
+            print("---------------------------------------")
+
+        computers.append(count_computer)
+        keyboards.append(count_keyboard)
+        mouses.append(count_mouse)
+
+    for i in indices:
             # i = i[0]
-            box = bbox[i]
-            x,y,w,h = box[0],box[1],box[2],box[3]
-            cv2.rectangle(img, (x,y),(x+w,h+y), color=(0, 255, 0), thickness=2)
-            cv2.putText(img,classNames[classIds[i]-1].upper(),(box[0]+10,box[1]+30),
-            cv2.FONT_HERSHEY_COMPLEX,1,(0,255,0),2)
+        box = bbox[i]
+        x,y,w,h = box[0],box[1],box[2],box[3]
+        cv2.rectangle(img, (x,y),(x+w,h+y), color=(0, 255, 0), thickness=2)
+        cv2.putText(img,classNames[classIds[i]-1].upper(),(box[0]+10,box[1]+30),
+        cv2.FONT_HERSHEY_COMPLEX,1,(0,255,0),2)
 
         # if len(classIds) != 0:
         #     for classId, confidence,box in zip(classIds.flatten(),confs.flatten(),bbox):
@@ -102,65 +130,96 @@ while time.time() < t_end:
         #         cv2.putText(img,str(round(confidence*100,2)),(box[0]+200,box[1]+30),
         #         cv2.FONT_HERSHEY_COMPLEX,1,(0,255,0),2)
 
-        cv2.imshow('Output',img)
-        cv2.waitKey(1)
+    cv2.imshow('Output',img)
+    cv2.waitKey(1)
 
 
-# print()
-# print("Person count : " , person_ct)
-# print()
-# print("Maximum Person Detect : ",ct_person_maxi)
-# print()
 
-# print()
-# print("|  Second  |  Number of Persons  |")
-# print("|----------|---------------------|")
-
-# j=1
-# for i in person_ct:
-#     print(f"|  "+j+"   |    "+str(i)+"     |")
-#     j+=1
+# print(computers)
+# print(keyboards)
+# print(mouses)
 
 print()
 print()
-column_width = 10
 
-# Print the header
-print(f"{'Second':<{column_width}}{'Number of Laptops':<{column_width}}")
+table_data = [(i + 1, computers[i], keyboards[i], mouses[i]) for i in range(min(len(computers), len(keyboards), len(mouses)))]
 
-# Iterate over the list and print in tabular form
-for index, value in enumerate(person_ct):
-    print(f"{index+1:<{column_width}}{value:<{column_width}}")
+headers = ['Second', 'No of Computer', 'No of Keyboard', 'No of Mouse']
 
-print()  
-# print("Person dectect in time : " , set(person_time)) 
-size = len(set(person_time))
-arr = list(set(person_time))
-# print(arr)
+table = tabulate(table_data, headers=headers, tablefmt='grid')
 
-# print()
-# print()
-# print(set(bottle_time));
-# size2 = len(set(bottle_time))
-# arr2 = list(set(bottle_time))
+print(table)
 
-# if(arr[0]!=0):
-#     print("Person is not detected in between : 0 - ", arr[0])
+print()
+print()
 
-# for i in range(0,size-1) :
-#     if(arr[i+1] - arr[i] > 1) :
-#         print("Person Not Detected in between : ",arr[i] , "-" , arr[i+1])
+not_computers = []
+not_keyboards = []
+not_mouses = []
 
-# if(arr[size-1]!=duration-1):
-#     print("Person is not detected in between : ", arr[size-1] , "-", int(duration))
+for index,i in enumerate(computers):
+    if i == 0 :
+        not_computers.append(index+1)
+
+for index,i in enumerate(keyboards):
+    if i == 0 :
+        not_keyboards.append(index+1)
+
+for index,i in enumerate(mouses):
+    if i == 0 :
+        not_mouses.append(index+1)
 
 
-# if(size2 > 0 & arr2[0]!=0):
-#     print("Bottle is not detected in between : 0 - ", arr2[0])
-        
-# for i in range(0,size2-1) :
-#     if(arr2[i+1] - arr2[i] > 1) :
-#         print("Bottle Not Detected in between : ",arr2[i] , "-" , arr2[i+1])
-        
-# if(arr2[size2-1]!=duration-1):
-#     print("Bottle is not detected in between : ", arr2[size2-1] , "-", int(duration))
+
+if len(not_computers) == 0 :
+    print("Computer is detected all the time !!!")
+else :
+    print(f"Computer is not detected in {not_computers} seconds")
+
+if len(not_keyboards) == 0 :
+    print("Keyboard is detected all the time !!!")
+else :
+    print(f"Keybord is not detected in {not_keyboards} seconds")
+
+if len(not_mouses) == 0 :
+    print("Mouse is detected all the time !!!")
+else :
+    print(f"Mouse is not detected in {not_mouses} seconds")
+
+
+# Plot Graph 
+n = len(computers)
+seconds = [i + 1 for i in range(n)]
+
+plt.figure(figsize=(8, 6))
+plt.plot(seconds, computers, marker='o', color='b', label='Computers Detected')
+plt.xlabel('Seconds')
+plt.ylabel('Number of Computers Detected')
+plt.title('Number of Computers Detected over Time')
+plt.xticks(seconds)  
+plt.grid(True)
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(8, 6))
+plt.plot(seconds, keyboards, marker='o', color='b', label='Keyboards Detected')
+plt.xlabel('Seconds')
+plt.ylabel('Number of Keyboards Detected')
+plt.title('Number of Keyboards Detected over Time')
+plt.xticks(seconds)  
+plt.grid(True)
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(8, 6))
+plt.plot(seconds, mouses, marker='o', color='b', label='Mouses Detected')
+plt.xlabel('Seconds')
+plt.ylabel('Number of Mouses Detected')
+plt.title('Number of Mouses Detected over Time')
+plt.xticks(seconds)  
+plt.grid(True)
+plt.legend()
+plt.show()
+
+print()
+print()
